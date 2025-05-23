@@ -1,0 +1,274 @@
+###### This is an R programming file and will work best in R programming interface only
+#####but it does absolutely all that is needed
+
+##loading all libraries
+library(RSelenium)
+library(wdman)
+library(netstat)
+library(rvest)
+library(magrittr)
+library(stringr)
+library(ralger)
+library(pdftools)
+library(tidyverse)
+
+##installing the required selenium
+selenium()
+selenium_object <- selenium(retcommand = T, check = F)
+
+binman::list_versions("chromedriver")
+ports_in_use()
+remote_driver <- rsDriver(browser = "chrome", chromever = "136.0.7103.94",
+                          verbose = F)
+chrome_command <- chrome(retcommand = T, verbose = F, check= F)
+##opening the headless chrome to control navigation
+remDr <- remote_driver$client
+
+remDr$open()
+
+##Navigating to the link that was provided(NB: this link ia invalid, clicked the valid link)
+remDr$navigate("https://www.ibdb.com/broadway-productionhttps://www.ticketmaster.com/broadway")
+Sys.sleep(5)
+we <- remDr$findElement(using = "link text", "Shows")$clickElement()
+Sys.sleep(30)
+remDr$maxWindowSize()
+
+
+
+##Adding the captcha cookie as ist is cloudfare captcha which may later give issues
+remDr$addCookie(name = "__cf_bm", value = "3CRiXG1Ix3rkSPsBKNOEBYiHhP9_wkOZzUGykK_Nlnc-1747998134-1.0.1.1-WPIfcWJ_4RA1242bBrm9wyvk_9aB9zmAWOPNfig214w8AXXQTbNhzLYOycobA.vt.MD7onb9eg29shaJpP80uVTuYBfg8gdYB81GVF3auh0",
+                domain = "www.ibdb.com", path = "/")
+starting_url <- remDr$getCurrentUrl()[[1]]
+
+all_shows <- list()
+index <- 1
+
+tab_elems <- remDr$findElements(using = "xpath", "(//ul[@class='tabs']//li)")
+####writing the loops to scrape the site. explanation in readme file
+for (t in 1:min(4, seq_along(tab_elems))) {
+  # Refresh tabs after every load
+  tab_elems <- remDr$findElements(using = "xpath", "(//ul[@class='tabs']//li)")
+  tab_elems[[t]]$clickElement()
+  Sys.sleep(3)
+  
+  try({
+    captcha_elem <- remDr$findElements(using = "xpath", '//*[@id="wBIvQ7"]/div/label/span[1]')
+    if (length(captcha_elem) > 0) {
+      captcha_elem[[1]]$clickElement()
+      Sys.sleep(1)
+    }
+  }, silent = TRUE)
+  
+  # Get links for current tab (titles & hrefs)
+  show_cards <- remDr$findElements(
+    using = "xpath",
+    "//div[contains(@class, 'xt-iblock-inner') and not(ancestor::div[contains(@style, 'display: none')])]"
+  )
+  show_links <- remDr$findElements(
+    using = "xpath",
+    "//div[contains(@class, 'xt-iblock-inner') and not(ancestor::div[contains(@style, 'display: none')])]//a"
+  )
+  show_imgs <- remDr$findElements(
+    using = "xpath", 
+    "//div[contains(@class, 'xt-iblock-inner') and not(ancestor::div[contains(@style, 'display: none')])]//span"
+  )
+  
+  for (i in seq_along(show_cards)) {
+    if (i > length(show_links)) next
+    
+    title <- Description_link <- style_attr <- image_url <- NA
+    theatre_Name <- theatre_venue <- Date <- performance <- type <- NA
+    
+    try(title <- show_cards[[i]]$getElementText() %>% unlist(), silent = TRUE)
+    try(Description_link <- show_links[[i]]$getElementAttribute("href") %>% unlist(), silent = TRUE)
+    try(style_attr <- show_imgs[[i]]$getElementAttribute("style") %>% unlist(), silent = TRUE)
+    image_url <- str_match(style_attr, 'url\\(\\"(.*?)\\"\\)')[,2]
+    
+    # Navigate to the show's detail page
+    remDr$navigate(Description_link)
+    Sys.sleep(3)
+    
+    # CAPTCHA on detail page
+    try({
+      captcha_elem <- remDr$findElements(using = "xpath", '//*[@id="wBIvQ7"]/div/label/span[1]')
+      if (length(captcha_elem) > 0) {
+        captcha_elem[[1]]$clickElement()
+        Sys.sleep(1)
+      }
+    }, silent = TRUE)
+    
+    if (t %in% 1:2) {
+    
+    try({
+      theatre <- remDr$findElement(using = "xpath", "//div[@class= 'col s12 m4 theatre']//a")
+      theatre$clickElement()
+      Sys.sleep(2)
+      
+      # Inner captcha
+      try({
+        captcha_elem <- remDr$findElements(using = "xpath", '//*[@id="wBIvQ7"]/div/label/span[1]')
+        if (length(captcha_elem) > 0) {
+          captcha_elem[[1]]$clickElement()
+          Sys.sleep(1)
+        }
+      }, silent = TRUE)
+      
+      theatre1 <- remDr$findElement(using = "xpath", "//div[@class= 'col s12']//h1")
+      theatre_Name <- theatre1$getElementText() %>% unlist()
+      
+      theatre2 <- remDr$findElement(using = "xpath", "//div[@class= 'col s12']//i")
+
+      theatre_venue <- theatre2$getElementText() %>% unlist()
+      
+      remDr$navigate(Description_link)
+      Sys.sleep(3)
+    }, silent = TRUE)
+    
+    try({
+      theatre3 <- remDr$findElement(using = "xpath", "//div[@class= 'col s12 m4 theatre']//i")
+      remDr$mouseMoveToLocation(webElement = theatre3)
+       Date <- theatre3$getElementText() %>% unlist()
+      Date <- gsub("[()]", "", Date)
+    }, silent = TRUE)
+      
+      try({
+      performance <- remDr$findElement(
+        using = "xpath", 
+        "/html/body/div[2]/div[1]/div[1]/div/div[1]/div[1]/div/div[2]/div[2]/div[3]/div[2]/div[2]"
+      )$getElementText() %>% unlist()
+    }, silent = TRUE)
+      
+
+    }else if (t %in% 3:4) {
+      try({
+        theatre <- remDr$findElement(using = "xpath", "/html/body/div[2]/div[1]/div/div/div[2]//a")
+        theatre$clickElement()
+        
+        Sys.sleep(3)
+        
+        # Inner captcha
+        try({
+          captcha_elem <- remDr$findElements(using = "xpath", '//*[@id="wBIvQ7"]/div/label/span[1]')
+          if (length(captcha_elem) > 0) {
+            captcha_elem[[1]]$clickElement()
+            Sys.sleep(1)
+          }
+        }, silent = TRUE)
+        
+        
+        theatre1 <- remDr$findElement(using = "xpath", "//div[@class= 'col s12']//h1")
+        theatre_Name <- theatre1$getElementText() %>% unlist()
+        
+        
+        theatre2 <- remDr$findElement(using = "xpath", "//div[@class= 'col s12']//i")
+        theatre_venue <- theatre2$getElementText() %>% unlist()
+       
+        
+        remDr$navigate(Description_link)
+        Sys.sleep(1)
+      }, silent = TRUE)
+      
+      try({
+        theatre3 <- remDr$findElement(using = "xpath", "/html/body/div[2]/div[1]/div/div/div[1]/div[1]/div/div[2]/div[1]/div[1]/h4")
+        Date <- theatre3$getElementText() %>% unlist()
+        Date <- gsub("[()]", "", Date)
+      }, silent = TRUE)
+      
+      performance <- "Not_Applicable"
+      
+      
+    }
+    
+      
+    
+    try({
+      type <- remDr$findElement(
+        using = "xpath", 
+        "/html/body/div[2]/div[1]/div[1]/div/div[1]/div[1]/div/div[2]/div[3]/div[1]/i[1]"
+      )$getElementText() %>% unlist()
+    }, silent = TRUE)
+    
+    scrape_time <- Sys.time()
+    
+    all_shows[[index]] <- tibble::tibble(
+      title = title,
+      Description_link = Description_link,
+      image_urls = image_url,
+      theatre_Name = theatre_Name,
+      theatre_venue = theatre_venue,
+      Date = Date,
+      performance = performance,
+      type = type,
+      scrape_time = scrape_time
+    )
+    index <- index + 1
+    
+    # Go back to main listing and re-click the tab
+    remDr$navigate(starting_url)
+    
+    Sys.sleep(5)
+    
+    # CAPTCHA after returning
+    try({
+      captcha_elem <- remDr$findElements(using = "xpath", '//*[@id="wBIvQ7"]/div/label/span[1]')
+      if (length(captcha_elem) > 0) {
+        captcha_elem[[1]]$clickElement()
+        Sys.sleep(1)
+      }
+    }, silent = TRUE)
+    
+    tab_elems <- remDr$findElements(using = "xpath", "(//ul[@class='tabs']//li)")
+    tab_elems[[t]]$clickElement()
+    Sys.sleep(3)
+    
+    # Re-fetch elements to continue from same tab
+    show_cards <- remDr$findElements(
+      using = "xpath",
+      "//div[contains(@class, 'xt-iblock-inner') and not(ancestor::div[contains(@style, 'display: none')])]"
+    )
+    show_links <- remDr$findElements(
+      using = "xpath",
+      "//div[contains(@class, 'xt-iblock-inner') and not(ancestor::div[contains(@style, 'display: none')])]//a"
+    )
+    show_imgs <- remDr$findElements(
+      using = "xpath", 
+      "//div[contains(@class, 'xt-iblock-inner') and not(ancestor::div[contains(@style, 'display: none')])]//span"
+    )
+  }
+  if(t > 4) break
+}
+
+###binding all rows
+
+all_shows_df <- bind_rows(all_shows)
+
+###replacing NAs
+all_shows_df <- all_shows_df%>%
+  replace(is.na(.), "Not_Applicable")
+###Reading previous file if available
+all_shows_df1 <- read.csv("C:/Users/hp/Documents/mytulz/ibdb_shows_2025-05-23.csv")
+
+###bind previous and new file
+all_shows_df <- rbind(all_shows_df1, all_shows_df)
+
+###keep only dinstict rows to avoid duplicates
+all_shows_df <- all_shows_df %>%
+  distinct(across(-scrape_time), .keep_all = TRUE)
+
+###filter only new scraped data
+today <- all_shows_df %>%
+  filter(as.Date(scrape_time) == Sys.Date())
+
+###write the new data as csv to documents
+write.csv(all_shows_df, paste0("ibdb_shows_", Sys.Date(), ".csv"), row.names = FALSE)
+
+###sends message to slack 
+if (nrow(today) > 0) {
+  print("scraped new")
+  remDr$navigate("https://app.slack.com/client/T068G718K28/D068AB766RL")
+  Sys.sleep(5)  # wait for Slack to fully load
+  
+  type_mssg <- remDr$findElement(using = "xpath", "/html/body/div[2]/div/div/div[4]/div[2]/div/div[2]/div[2]/div/div/div[3]/div/div/div[2]/div/div/div[2]/div/div/div/div[2]/div/div[1]/p")
+  type_mssg$sendKeysToElement(list('I have just scraped new elements', key = "enter"))
+}
+
