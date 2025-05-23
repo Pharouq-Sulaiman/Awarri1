@@ -265,10 +265,21 @@ write.csv(all_shows_df, paste0("ibdb_shows_", Sys.Date(), ".csv"), row.names = F
 ###sends message to slack 
 if (nrow(today) > 0) {
   print("scraped new")
+  
   remDr$navigate("https://app.slack.com/client/T068G718K28/D068AB766RL")
   Sys.sleep(5)  # wait for Slack to fully load
   
+  input_elem <- remDr$findElement(using = "xpath", "//*[@id='domain']")
+  input_elem$sendKeysToElement(list('Awarri', key = "enter"))
+  click_pass <- remDr$findElement(using = "xpath", "//*[@id='page_contents']/div/div/div[2]/div[3]/div[2]/span/a")
+  click_pass$clickElement()
+  input_mail <- remDr$findElement(using = "xpath", "//*[@id='email']")
+  input_mail$sendKeysToElement(list('sulaimanpharouq01@gmail.com', key = "enter"))
+  input_pass <- remDr$findElement(using = "xpath", "//*[@id='password']")
+  input_pass$sendKeysToElement(list('Awarriwork-1', key = "enter"))
+  remDr$findElement(using = "xpath", "//*[@id='page_contents']/div/div/div[2]/p/a")$clickElement()
   type_mssg <- remDr$findElement(using = "xpath", "/html/body/div[2]/div/div/div[4]/div[2]/div/div[2]/div[2]/div/div/div[3]/div/div/div[2]/div/div/div[2]/div/div/div/div[2]/div/div[1]/p")
   type_mssg$sendKeysToElement(list('I have just scraped new elements', key = "enter"))
 }
+
 
