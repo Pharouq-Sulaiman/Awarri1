@@ -45,7 +45,7 @@ index <- 1
 
 tab_elems <- remDr$findElements(using = "xpath", "(//ul[@class='tabs']//li)")
 ####writing the loops to scrape the site. explanation in readme file
-for (t in 1:min(4, seq_along(tab_elems))) {
+for (t in seq_along(tab_elems)) {
   # Refresh tabs after every load
   tab_elems <- remDr$findElements(using = "xpath", "(//ul[@class='tabs']//li)")
   tab_elems[[t]]$clickElement()
@@ -235,7 +235,7 @@ for (t in 1:min(4, seq_along(tab_elems))) {
       "//div[contains(@class, 'xt-iblock-inner') and not(ancestor::div[contains(@style, 'display: none')])]//span"
     )
   }
-  if(t > 4) break
+  
 }
 
 ###binding all rows
